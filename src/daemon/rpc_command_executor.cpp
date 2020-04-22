@@ -43,6 +43,10 @@
 #include <ctime>
 #include <string>
 
+#if defined(SEKRETA)
+#include "net/parse.h"
+#endif
+
 #undef MONERO_DEFAULT_LOG_CATEGORY
 #define MONERO_DEFAULT_LOG_CATEGORY "daemon"
 
@@ -611,8 +615,8 @@ bool t_rpc_command_executor::mining_status() {
     uint64_t daily = 86400ull / mres.block_target * mres.block_reward * ratio;
     uint64_t monthly = 86400ull / mres.block_target * 30.5 * mres.block_reward * ratio;
     uint64_t yearly = 86400ull / mres.block_target * 356 * mres.block_reward * ratio;
-    tools::msg_writer() << "Expected: " << cryptonote::print_money(daily) << " monero daily, "
-        << cryptonote::print_money(monthly) << " monero monthly, " << cryptonote::print_money(yearly) << " yearly";
+    tools::msg_writer() << "Expected: " << cryptonote::print_money(daily) << " coinevo daily, "
+        << cryptonote::print_money(monthly) << " coinevo monthly, " << cryptonote::print_money(yearly) << " yearly";
   }
 
   return true;
@@ -1345,6 +1349,40 @@ bool t_rpc_command_executor::print_transaction_pool_stats() {
   return true;
 }
 
+#if defined(SEKRETA)
+bool t_rpc_command_executor::sekreta(
+    const ::sekreta::api::impl_helper::DaemonArgs<std::string>& args)
+{
+  cryptonote::COMMAND_RPC_SEKRETA::request req;
+  cryptonote::COMMAND_RPC_SEKRETA::response res;
+
+  req.command = args.command;
+  req.system = args.system;
+  req.system_args = args.system_args;
+
+  constexpr char fail_message[] = "Sekreta did NOT successfully execute";
+
+  if (m_is_rpc)  // We're getting it from an RPC client, most likely the wallet
+    {
+      if (m_rpc_client->rpc_request(req, res, "/sekreta", fail_message))
+        {
+          tools::success_msg_writer() << "Sekreta executed";
+          return true;
+        }
+      tools::fail_msg_writer() << make_error(fail_message, res.status);
+      return false;
+    }
+
+  if (!m_rpc_server->on_sekreta(req, res) || res.status != CORE_RPC_STATUS_OK)
+   {
+      tools::fail_msg_writer() << make_error(fail_message, res.status);
+      return false;
+    }
+
+  return true;
+}
+#endif
+
 bool t_rpc_command_executor::start_mining(cryptonote::account_public_address address, uint64_t num_threads, cryptonote::network_type nettype, bool do_background_mining, bool ignore_battery) {
   cryptonote::COMMAND_RPC_START_MINING::request req;
   cryptonote::COMMAND_RPC_START_MINING::response res;
@@ -1408,8 +1446,8 @@ bool t_rpc_command_executor::stop_daemon()
 //# ifdef WIN32
 //    // Stop via service API
 //    // TODO - this is only temporary!  Get rid of hard-coded constants!
-//    bool ok = windows::stop_service("BitMonero Daemon");
-//    ok = windows::uninstall_service("BitMonero Daemon");
+//    bool ok = windows::stop_service("Coinevo Daemon");
+//    ok = windows::uninstall_service("Coinevo Daemon");
 //    //bool ok = windows::stop_service(SERVICE_NAME);
 //    //ok = windows::uninstall_service(SERVICE_NAME);
 //    if (ok)
@@ -1453,10 +1491,10 @@ bool t_rpc_command_executor::print_status()
   bool daemon_is_alive = m_rpc_client->check_connection();
 
   if(daemon_is_alive) {
-    tools::success_msg_writer() << "monerod is running";
+    tools::success_msg_writer() << "coinevod is running";
   }
   else {
-    tools::fail_msg_writer() << "monerod is NOT running";
+    tools::fail_msg_writer() << "coinevod is NOT running";
   }
 
   return true;

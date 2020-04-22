@@ -32,6 +32,9 @@
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
 #define MONERO_DEFAULT_LOG_CATEGORY "daemon"
+#if defined(SEKRETA)
+#include "net/sekreta.h"
+#endif
 
 namespace daemonize {
 
@@ -327,6 +330,36 @@ bool t_command_parser_executor::print_transaction_pool_stats(const std::vector<s
 
   return m_executor.print_transaction_pool_stats();
 }
+
+#if defined(SEKRETA)
+bool t_command_parser_executor::sekreta(const std::vector<std::string>& args)
+{
+  namespace impl = ::sekreta::api::impl_helper;
+  namespace type = impl::type;
+
+  using t_value = std::string;
+  using t_args = impl::DaemonArgs<t_value>;
+
+  std::pair<std::optional<t_args>, std::optional<t_value>> const daemon_args =
+      impl::parse_args<t_args, t_value>(args);
+
+  if (!daemon_args.first)
+    {
+      std::cout << daemon_args.second.value() << std::endl;
+      return true;
+    }
+
+  // TODO(anonimal): temporary
+  if (daemon_args.first.value().system
+      != t_args::get_value<type::kSystem>(type::kSystem::Kovri))
+    {
+      std::cout << "Only Kovri is currently supported" << std::endl;
+      return true;
+    }
+
+  return m_executor.sekreta(daemon_args.first.value());
+}
+#endif
 
 bool t_command_parser_executor::start_mining(const std::vector<std::string>& args)
 {
@@ -824,10 +857,10 @@ bool t_command_parser_executor::prune_blockchain(const std::vector<std::string>&
 
   if (args.empty() || args[0] != "confirm")
   {
-    std::cout << "Warning: pruning from within monerod will not shrink the database file size." << std::endl;
+    std::cout << "Warning: pruning from within coinevod will not shrink the database file size." << std::endl;
     std::cout << "Instead, parts of the file will be marked as free, so the file will not grow" << std::endl;
     std::cout << "until that newly free space is used up. If you want a smaller file size now," << std::endl;
-    std::cout << "exit monerod and run monero-blockchain-prune (you will temporarily need more" << std::endl;
+    std::cout << "exit coinevod and run coinevo-blockchain-prune (you will temporarily need more" << std::endl;
     std::cout << "disk space for the database conversion though). If you are OK with the database" << std::endl;
     std::cout << "file keeping the same size, re-run this command with the \"confirm\" parameter." << std::endl;
     return true;

@@ -86,7 +86,11 @@ namespace cryptonote {
     const int target = version < 2 ? DIFFICULTY_TARGET_V1 : DIFFICULTY_TARGET_V2;
     const int target_minutes = target / 60;
     const int emission_speed_factor = EMISSION_SPEED_FACTOR_PER_MINUTE - (target_minutes-1);
-
+    if (already_generated_coins == 0)
+    {
+      reward = 400000000000000000;
+      return true;
+    }
     uint64_t base_reward = (MONEY_SUPPLY - already_generated_coins) >> emission_speed_factor;
     if (base_reward < FINAL_SUBSIDY_PER_MINUTE*target_minutes)
     {
@@ -102,6 +106,10 @@ namespace cryptonote {
 
     if (current_block_weight <= median_weight) {
       reward = base_reward;
+      if (version >= 13) {
+          // reducing reward in version 13
+          reward /= 6;
+      }
       return true;
     }
 
@@ -125,6 +133,10 @@ namespace cryptonote {
     assert(reward_lo < base_reward);
 
     reward = reward_lo;
+    if (version >= 13) { 
+          // reducing reward in version 13
+        reward /= 6;
+    }
     return true;
   }
   //------------------------------------------------------------------------------------

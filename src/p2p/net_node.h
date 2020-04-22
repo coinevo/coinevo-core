@@ -59,6 +59,10 @@
 #include "net/fwd.h"
 #include "common/command_line.h"
 
+#if defined(SEKRETA)
+#include "net/sekreta.h"
+#endif
+
 PUSH_WARNINGS
 DISABLE_VS_WARNINGS(4355)
 
@@ -249,6 +253,9 @@ namespace nodetool
         m_offline(false),
         is_closing(false),
         m_network_id()
+#if defined(SEKRETA)
+      , m_sekreta(std::make_shared<net::sekreta::Sekreta>())
+#endif
     {}
     virtual ~node_server();
 
@@ -292,10 +299,8 @@ namespace nodetool
 
   private:
     const std::vector<std::string> m_seed_nodes_list =
-    { "seeds.moneroseeds.se"
-    , "seeds.moneroseeds.ae.org"
-    , "seeds.moneroseeds.ch"
-    , "seeds.moneroseeds.li"
+    { "seeds.coinevo.tech"
+    , "seed2.coinevo.tech"
     };
 
     bool islimitup=false;
@@ -502,6 +507,17 @@ namespace nodetool
     cryptonote::network_type m_nettype;
 
     epee::net_utils::ssl_support_t m_ssl_support;
+#if defined(SEKRETA)
+   public:
+    //! \return Copy of pointer to shared Sekreta instance
+    //! \todo It's still too early to know if we need an actual copy as there's
+    //!   currently no need to reseat, etc.
+    std::shared_ptr<net::sekreta::Sekreta> sekreta() { return m_sekreta; }
+
+   private:
+    //! \brief Daemon's Sekreta instance
+    std::shared_ptr<net::sekreta::Sekreta> m_sekreta;
+#endif
   };
 
     const int64_t default_limit_up = P2P_DEFAULT_LIMIT_RATE_UP;      // kB/s

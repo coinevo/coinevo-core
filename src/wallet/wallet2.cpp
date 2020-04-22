@@ -83,6 +83,9 @@ using namespace epee;
 #include "device/device_cold.hpp"
 #include "device_trezor/device_trezor.hpp"
 #include "net/socks_connect.h"
+#if defined(SEKRETA)
+#include "net/parse.h"
+#endif
 
 extern "C"
 {
@@ -102,9 +105,9 @@ using namespace cryptonote;
 // used to target a given block weight (additional outputs may be added on top to build fee)
 #define TX_WEIGHT_TARGET(bytes) (bytes*2/3)
 
-#define UNSIGNED_TX_PREFIX "Monero unsigned tx set\004"
-#define SIGNED_TX_PREFIX "Monero signed tx set\004"
-#define MULTISIG_UNSIGNED_TX_PREFIX "Monero multisig unsigned tx set\001"
+#define UNSIGNED_TX_PREFIX "Coinevo unsigned tx set\004"
+#define SIGNED_TX_PREFIX "Coinevo signed tx set\004"
+#define MULTISIG_UNSIGNED_TX_PREFIX "Coinevo multisig unsigned tx set\001"
 
 #define RECENT_OUTPUT_RATIO (0.5) // 50% of outputs are from the recent zone
 #define RECENT_OUTPUT_DAYS (1.8) // last 1.8 day makes up the recent zone (taken from monerolink.pdf, Miller et al)
@@ -118,11 +121,11 @@ using namespace cryptonote;
 #define SUBADDRESS_LOOKAHEAD_MAJOR 50
 #define SUBADDRESS_LOOKAHEAD_MINOR 200
 
-#define KEY_IMAGE_EXPORT_FILE_MAGIC "Monero key image export\003"
+#define KEY_IMAGE_EXPORT_FILE_MAGIC "Coinevo key image export\003"
 
-#define MULTISIG_EXPORT_FILE_MAGIC "Monero multisig export\001"
+#define MULTISIG_EXPORT_FILE_MAGIC "Coinevo multisig export\001"
 
-#define OUTPUT_EXPORT_FILE_MAGIC "Monero output export\004"
+#define OUTPUT_EXPORT_FILE_MAGIC "Coinevo output export\004"
 
 #define SEGREGATION_FORK_HEIGHT 99999999
 #define TESTNET_SEGREGATION_FORK_HEIGHT 99999999
@@ -137,14 +140,14 @@ using namespace cryptonote;
 #define DEFAULT_MIN_OUTPUT_COUNT 5
 #define DEFAULT_MIN_OUTPUT_VALUE (2*COIN)
 
-#define DEFAULT_INACTIVITY_LOCK_TIMEOUT 90 // a minute and a half
+#define DEFAULT_INACTIVITY_LOCK_TIMEOUT 490 // a minute and a half
 
 #define IGNORE_LONG_PAYMENT_ID_FROM_BLOCK_VERSION 12
 
 static const std::string MULTISIG_SIGNATURE_MAGIC = "SigMultisigPkV1";
 static const std::string MULTISIG_EXTRA_INFO_MAGIC = "MultisigxV1";
 
-static const std::string ASCII_OUTPUT_MAGIC = "MoneroAsciiDataV1";
+static const std::string ASCII_OUTPUT_MAGIC = "CoinevoAsciiDataV1";
 
 boost::mutex tools::wallet2::default_daemon_address_lock;
 std::string tools::wallet2::default_daemon_address = "";
@@ -154,7 +157,7 @@ namespace
   std::string get_default_ringdb_path()
   {
     boost::filesystem::path dir = tools::get_default_data_dir();
-    // remove .bitmonero, replace with .shared-ringdb
+    // remove .coinevo, replace with .shared-ringdb
     dir = dir.remove_filename();
     dir /= ".shared-ringdb";
     return dir.string();
@@ -250,6 +253,9 @@ namespace
 struct options {
   const command_line::arg_descriptor<std::string> daemon_address = {"daemon-address", tools::wallet2::tr("Use daemon instance at <host>:<port>"), ""};
   const command_line::arg_descriptor<std::string> daemon_host = {"daemon-host", tools::wallet2::tr("Use daemon instance at host <arg> instead of localhost"), ""};
+#if defined(SEKRETA)
+  const command_line::arg_descriptor<std::string> sekreta = {"sekreta", tools::wallet2::tr("Use Sekreta to connect to a remote daemon. Accepts a single system or a comma-delimited set of systems. Example: --sekreta kovri --daemon-host wqr5kmjdpvnlcg7mzlg6bqin3izawq2226gxq4bacgxiy4aeoprq.b32.i2p"), {}, true};
+#endif
   const command_line::arg_descriptor<std::string> proxy = {"proxy", tools::wallet2::tr("[<ip>:]<port> socks proxy to use for daemon connections"), {}, true};
   const command_line::arg_descriptor<bool> trusted_daemon = {"trusted-daemon", tools::wallet2::tr("Enable commands which rely on a trusted daemon"), false};
   const command_line::arg_descriptor<bool> untrusted_daemon = {"untrusted-daemon", tools::wallet2::tr("Disable commands which rely on a trusted daemon"), false};
@@ -334,7 +340,9 @@ std::unique_ptr<tools::wallet2> make_basic(const boost::program_options::variabl
   const network_type nettype = testnet ? TESTNET : stagenet ? STAGENET : MAINNET;
   const uint64_t kdf_rounds = command_line::get_arg(vm, opts.kdf_rounds);
   THROW_WALLET_EXCEPTION_IF(kdf_rounds == 0, tools::error::wallet_internal_error, "KDF rounds must not be 0");
-
+#if defined(SEKRETA)
+  bool const use_sekreta = command_line::has_arg(vm, opts.sekreta);  // Get later (get_arg here will throw boost::any_cast)
+#endif
   const bool use_proxy = command_line::has_arg(vm, opts.proxy);
   auto daemon_address = command_line::get_arg(vm, opts.daemon_address);
   auto daemon_host = command_line::get_arg(vm, opts.daemon_host);
@@ -380,9 +388,6 @@ std::unique_ptr<tools::wallet2> make_basic(const boost::program_options::variabl
     std::move(daemon_ssl_private_key), std::move(daemon_ssl_certificate)
   };
 
-  THROW_WALLET_EXCEPTION_IF(!daemon_address.empty() && !daemon_host.empty() && 0 != daemon_port,
-      tools::error::wallet_internal_error, tools::wallet2::tr("can't specify daemon host or port more than once"));
-
   boost::optional<epee::net_utils::http::login> login{};
   if (command_line::has_arg(vm, opts.daemon_login))
   {
@@ -401,6 +406,65 @@ std::unique_ptr<tools::wallet2> make_basic(const boost::program_options::variabl
 
     login.emplace(std::move(parsed->username), std::move(parsed->password).password());
   }
+  THROW_WALLET_EXCEPTION_IF(!daemon_address.empty() && !daemon_host.empty() && 0 != daemon_port,
+    tools::error::wallet_internal_error, tools::wallet2::tr("can't specify daemon host or port more than once"));
+
+#if defined(SEKRETA)
+  if (use_sekreta)
+    {
+      auto const sekreta_arg = command_line::get_arg(vm, opts.sekreta);
+
+      THROW_WALLET_EXCEPTION_IF(  // if "" is given as argument
+          sekreta_arg.empty(),
+          tools::error::wallet_internal_error,
+          tools::wallet2::tr("Must enter an anonymity system or "
+                             "comma-delimited set of systems"));
+
+      THROW_WALLET_EXCEPTION_IF(
+          use_proxy,
+          tools::error::wallet_internal_error,
+          tools::wallet2::tr("Proxy option not supported. Sekreta provides "
+                             "anonymous networking"));
+
+      THROW_WALLET_EXCEPTION_IF(
+          daemon_address.empty() && daemon_host.empty(),
+          tools::error::wallet_internal_error,
+          tools::wallet2::tr("Must enter a daemon address"));
+
+      std::pair<std::string, uint16_t> daemon{
+          !daemon_address.empty() ? daemon_address : daemon_host,
+          daemon_port ? daemon_port : get_config(nettype).RPC_DEFAULT_PORT};
+
+      // Verify given networks
+      std::vector<std::string> parsed;
+      boost::split(parsed, sekreta_arg, boost::is_any_of(","));
+
+      // TODO(unassigned): currently only returns a single verified address
+      // TODO(unassigned): currently assumes Kovri only. Refactor after more networks are supported.
+      // TODO(unassigned): add option for API type (library, socket-based, etc.)
+      using t_address = expect<epee::net_utils::network_address>;
+      using t_value = std::string;
+      std::pair<std::optional<t_address>, std::optional<t_value>> const
+          address =
+              net::sekreta::parse_cli_arg<t_address, t_value>(daemon, parsed);
+
+      THROW_WALLET_EXCEPTION_IF(
+          !address.first,
+          tools::error::wallet_internal_error,
+          tools::wallet2::tr(address.second.value().c_str()));
+
+      if (daemon_host.empty())
+        daemon_host = address.first.value()->host_str();
+
+      if (!daemon_port)
+        daemon_port = address.first.value()->port();
+
+      // See below: system(s) are started using their respective default arguments.
+      // For fine-grained control, start within wallet or daemon instead of here within CLI
+    }
+  else
+    {
+#endif
 
   if (daemon_host.empty())
     daemon_host = "localhost";
@@ -421,6 +485,9 @@ std::unique_ptr<tools::wallet2> make_basic(const boost::program_options::variabl
 
   if (daemon_address.empty())
     daemon_address = std::string("http://") + daemon_host + ":" + std::to_string(daemon_port);
+#if defined(SEKRETA)
+    }
+#endif
 
   {
     const boost::string_ref real_daemon = boost::string_ref{daemon_address}.substr(0, daemon_address.rfind(':'));
@@ -488,6 +555,91 @@ std::unique_ptr<tools::wallet2> make_basic(const boost::program_options::variabl
   }
 
   std::unique_ptr<tools::wallet2> wallet(new tools::wallet2(nettype, kdf_rounds, unattended));
+#if defined(SEKRETA)
+  // Start Sekreta here so simplewallet can grab the instance
+  if (use_sekreta)
+    {
+      // We shouldn't be running at this point
+      THROW_WALLET_EXCEPTION_IF(
+          wallet->sekreta()->size(),
+          tools::error::wallet_internal_error,
+          tools::wallet2::tr("Sekreta already in use"));
+
+      namespace type = ::sekreta::type;
+      // TODO(anonimal): this is temporary work-around for a single-system only
+      namespace api = ::sekreta::api::kovri;
+      std::shared_ptr<api::Trait> trait;
+      std::shared_ptr<api::Library> lib;
+      std::shared_ptr<api::Library::Path> path;
+      std::shared_ptr<type::kovri::PathData> path_data;
+
+      // Shared UID for wallet Sekreta instance
+      net::sekreta::UID const uid({std::string{tools::wallet2::UID}});
+      std::string const uid_lib{uid.name() + "lib"};
+      std::string const uid_path{uid.name() + "rpc-client"};
+      std::string const uid_trait{uid.name() + "trait"};
+
+      // Create library instance
+      try
+        {
+          lib = wallet->sekreta()->create<api::Library>({uid_lib});
+
+          // TODO(unassigned): we can accept CLI args after parser refactor
+          lib->configure({"--disable-console-log", "--enable-auto-flush-log"});
+          lib->start();
+
+          MINFO(tools::wallet2::tr("Sekreta created a library instance"));
+
+          // Create client tunnel instance
+          try
+            {
+              // TODO(unassigned): provide CLI option for local point
+              trait = wallet->sekreta()->create<api::Trait>({uid_trait});
+              path_data =
+                  trait->path()
+                      ->uid({uid_path})
+                      .type({type::kPathDirection::Client,
+                             type::kPathAffect::Default})
+                      .local_point({"127.0.0.1",
+                                    {cryptonote::get_config(nettype)
+                                         .SEK_RPC_DEFAULT_PORT,
+                                     {}}})
+                      .remote_point(
+                          {daemon_host,
+                           boost::lexical_cast<uint16_t>(daemon_port)})
+                      // crypto mutator filename left out for transient tunnel
+                      .build();
+
+              path = lib->path(path_data);
+              path->configure();
+              path->start();
+
+              MINFO(tools::wallet2::tr("Sekreta created an RPC client path"));
+            }
+          catch (const ::sekreta::Exception& ex)
+            {
+              THROW_WALLET_EXCEPTION(
+                  tools::error::wallet_internal_error,
+                  tools::wallet2::tr(ex.what()));
+            }
+
+          // Hand-off to simplewallet
+          wallet->sekreta()->check_in<api::Library::Path>({uid_path}, path);
+          wallet->sekreta()->check_in<api::Library>({uid_lib}, lib);
+          wallet->sekreta()->check_in<api::Trait>({uid_trait}, trait);
+        }
+      catch (const ::sekreta::Exception& ex)
+        {
+          THROW_WALLET_EXCEPTION(
+              tools::error::wallet_internal_error,
+              tools::wallet2::tr(ex.what()));
+        }
+
+      daemon_address =
+          std::string{"http://"} + path_data->local_point().dest() + ":"
+          + std::to_string(path_data->local_point().port().bound());
+    }
+#endif
   wallet->init(std::move(daemon_address), std::move(login), std::move(proxy), 0, *trusted_daemon, std::move(ssl_options));
   boost::filesystem::path ringdb_path = command_line::get_arg(vm, opts.shared_ringdb_dir);
   wallet->set_ring_database(ringdb_path.string());
@@ -1194,6 +1346,9 @@ wallet2::wallet2(network_type nettype, uint64_t kdf_rounds, bool unattended, std
   m_rpc_version(0),
   m_export_format(ExportFormat::Binary),
   m_credits_target(0)
+#if defined(SEKRETA)
+  , m_sekreta(std::make_shared<net::sekreta::Sekreta>())
+#endif
 {
   set_rpc_client_secret_key(rct::rct2sk(rct::skGen()));
 }
@@ -1227,6 +1382,9 @@ void wallet2::init_options(boost::program_options::options_description& desc_par
   const options opts{};
   command_line::add_arg(desc_params, opts.daemon_address);
   command_line::add_arg(desc_params, opts.daemon_host);
+#if defined(SEKRETA)
+  command_line::add_arg(desc_params, opts.sekreta);
+#endif
   command_line::add_arg(desc_params, opts.proxy);
   command_line::add_arg(desc_params, opts.trusted_daemon);
   command_line::add_arg(desc_params, opts.untrusted_daemon);
@@ -1777,8 +1935,8 @@ void wallet2::scan_output(const cryptonote::transaction &tx, bool miner_tx, cons
     if (!m_encrypt_keys_after_refresh)
     {
       boost::optional<epee::wipeable_string> pwd = m_callback->on_get_password(pool ? "output found in pool" : "output received");
-      THROW_WALLET_EXCEPTION_IF(!pwd, error::password_needed, tr("Password is needed to compute key image for incoming monero"));
-      THROW_WALLET_EXCEPTION_IF(!verify_password(*pwd), error::password_needed, tr("Invalid password: password is needed to compute key image for incoming monero"));
+      THROW_WALLET_EXCEPTION_IF(!pwd, error::password_needed, tr("Password is needed to compute key image for incoming coinevo"));
+      THROW_WALLET_EXCEPTION_IF(!verify_password(*pwd), error::password_needed, tr("Invalid password: password is needed to compute key image for incoming coinevo"));
       decrypt_keys(*pwd);
       m_encrypt_keys_after_refresh = *pwd;
     }
@@ -3261,7 +3419,7 @@ void wallet2::refresh(bool trusted_daemon, uint64_t start_height, uint64_t & blo
   if(m_light_wallet) {
 
     // MyMonero get_address_info needs to be called occasionally to trigger wallet sync.
-    // This call is not really needed for other purposes and can be removed if mymonero changes their backend.
+    // This call is not really needed for other purposes and can be removed if mycoinevo changes their backend.
     tools::COMMAND_RPC_GET_ADDRESS_INFO::response res;
 
     // Get basic info
@@ -3649,6 +3807,21 @@ bool wallet2::deinit()
   m_is_initialized=false;
   unlock_keys_file();
   m_account.deinit();
+#if defined(SEKRETA)
+  try
+    {
+      // TODO(anonimal): this only fits for a single *known* system
+      using t_api = ::sekreta::api::kovri::Library;
+      net::sekreta::UID const uid({std::string{tools::wallet2::UID} + "lib"});
+
+      if (m_sekreta->contains<t_api>(uid))
+        m_sekreta->borrow<t_api>(uid)->stop();
+    }
+  catch (const sekreta::Exception& ex)
+    {
+      MERROR(ex.what());
+    }
+#endif
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -6432,7 +6605,7 @@ void wallet2::commit_tx(pending_tx& ptx)
       const boost::lock_guard<boost::recursive_mutex> lock{m_daemon_rpc_mutex};
       bool r = epee::net_utils::invoke_http_json("/submit_raw_tx", oreq, ores, *m_http_client, rpc_timeout, "POST");
       THROW_WALLET_EXCEPTION_IF(!r, error::no_connection_to_daemon, "submit_raw_tx");
-      // MyMonero and OpenMonero use different status strings
+      // Mycoinevo and Opencoinevo use different status strings
       THROW_WALLET_EXCEPTION_IF(ores.status != "OK" && ores.status != "success" , error::tx_rejected, ptx.tx, get_rpc_status(ores.status), ores.error);
     }
   }
@@ -11901,9 +12074,9 @@ uint64_t wallet2::get_daemon_blockchain_target_height(string &err)
 uint64_t wallet2::get_approximate_blockchain_height() const
 {
   // time of v2 fork
-  const time_t fork_time = m_nettype == TESTNET ? 1448285909 : m_nettype == STAGENET ? 1520937818 : 1458748658;
+  const time_t fork_time = m_nettype == TESTNET ? 1581535951 : m_nettype == STAGENET ? 1581535951 : 1581535951 ;
   // v2 fork block
-  const uint64_t fork_block = m_nettype == TESTNET ? 624634 : m_nettype == STAGENET ? 32000 : 1009827;
+  const uint64_t fork_block = m_nettype == TESTNET ? 2 : m_nettype == STAGENET ? 5 : 5;
   // avg seconds per block
   const int seconds_per_block = DIFFICULTY_TARGET_V2;
   // Calculated blockchain height
@@ -13224,7 +13397,7 @@ std::string wallet2::make_uri(const std::string &address, const std::string &pay
     }
   }
 
-  std::string uri = "monero:" + address;
+  std::string uri = "coinevo:" + address;
   unsigned int n_fields = 0;
 
   if (!payment_id.empty())
@@ -13253,9 +13426,9 @@ std::string wallet2::make_uri(const std::string &address, const std::string &pay
 //----------------------------------------------------------------------------------------------------
 bool wallet2::parse_uri(const std::string &uri, std::string &address, std::string &payment_id, uint64_t &amount, std::string &tx_description, std::string &recipient_name, std::vector<std::string> &unknown_parameters, std::string &error)
 {
-  if (uri.substr(0, 7) != "monero:")
+  if (uri.substr(0, 7) != "coinevo:")
   {
-    error = std::string("URI has wrong scheme (expected \"monero:\"): ") + uri;
+    error = std::string("URI has wrong scheme (expected \"coinevo:\"): ") + uri;
     return false;
   }
 
@@ -13529,10 +13702,7 @@ uint64_t wallet2::get_segregation_fork_height() const
   {
     // All four MoneroPulse domains have DNSSEC on and valid
     static const std::vector<std::string> dns_urls = {
-        "segheights.moneropulse.org",
-        "segheights.moneropulse.net",
-        "segheights.moneropulse.co",
-        "segheights.moneropulse.se"
+
     };
 
     const uint64_t current_height = get_blockchain_current_height();
@@ -13579,7 +13749,7 @@ mms::multisig_wallet_state wallet2::get_multisig_wallet_state() const
   state.num_transfer_details = m_transfers.size();
   if (state.multisig)
   {
-    THROW_WALLET_EXCEPTION_IF(!m_original_keys_available, error::wallet_internal_error, "MMS use not possible because own original Monero address not available");
+    THROW_WALLET_EXCEPTION_IF(!m_original_keys_available, error::wallet_internal_error, "MMS use not possible because own original Coinevo address not available");
     state.address = m_original_address;
     state.view_secret_key = m_original_view_secret_key;
   }

@@ -1030,8 +1030,8 @@
     </message>
     <message>
         <location filename="../src/simplewallet/simplewallet.cpp" line="7388"/>
-        <source>Donating %s %s to The Monero Project (donate.getmonero.org or %s).</source>
-        <translation>Donare %s %s a The Monero Project (donate.getmonero.org o %s).</translation>
+        <source>Donating %s %s to The Monero Project (donate.coinevo.tech or %s).</source>
+        <translation>Donare %s %s a The Monero Project (donate.coinevo.tech o %s).</translation>
     </message>
     <message>
         <location filename="../src/simplewallet/simplewallet.cpp" line="7390"/>
@@ -1618,8 +1618,8 @@ Amount, Spent(&quot;T&quot;|&quot;F&quot;), &quot;frozen&quot;|&quot;locked&quot
     </message>
     <message>
         <location filename="../src/simplewallet/simplewallet.cpp" line="3134"/>
-        <source>Donate &lt;amount&gt; to the development team (donate.getmonero.org).</source>
-        <translation>Dona &lt;amount&gt; al team di sviluppo (donate.getmonero.org).</translation>
+        <source>Donate &lt;amount&gt; to the development team (donate.coinevo.tech).</source>
+        <translation>Dona &lt;amount&gt; al team di sviluppo (donate.coinevo.tech).</translation>
     </message>
     <message>
         <location filename="../src/simplewallet/simplewallet.cpp" line="3141"/>

@@ -79,6 +79,10 @@
 #include "readline_buffer.h"
 #endif
 
+#if defined(SEKRETA)
+#include "net/sekreta.h"
+#include "net/parse.h"
+#endif
 using namespace std;
 using namespace epee;
 using namespace cryptonote;
@@ -165,13 +169,16 @@ namespace
   const command_line::arg_descriptor<bool> arg_allow_mismatched_daemon_version = {"allow-mismatched-daemon-version", sw::tr("Allow communicating with a daemon that uses a different RPC version"), false};
   const command_line::arg_descriptor<uint64_t> arg_restore_height = {"restore-height", sw::tr("Restore from specific blockchain height"), 0};
   const command_line::arg_descriptor<std::string> arg_restore_date = {"restore-date", sw::tr("Restore from estimated blockchain height on specified date"), ""};
-  const command_line::arg_descriptor<bool> arg_do_not_relay = {"do-not-relay", sw::tr("The newly created transaction will not be relayed to the monero network"), false};
+  const command_line::arg_descriptor<bool> arg_do_not_relay = {"do-not-relay", sw::tr("The newly created transaction will not be relayed to the coinevo network"), false};
   const command_line::arg_descriptor<bool> arg_create_address_file = {"create-address-file", sw::tr("Create an address file for new wallets"), false};
   const command_line::arg_descriptor<std::string> arg_subaddress_lookahead = {"subaddress-lookahead", tools::wallet2::tr("Set subaddress lookahead sizes to <major>:<minor>"), ""};
   const command_line::arg_descriptor<bool> arg_use_english_language_names = {"use-english-language-names", sw::tr("Display English language names"), false};
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command = {"command", ""};
 
+#if defined(SEKRETA)
+  constexpr const char* USAGE_SEKRETA = "sekreta <location> <command> <system> [<args>]";
+#endif
   const char* USAGE_START_MINING("start_mining [<number_of_threads>] [bg_mining] [ignore_battery]");
   const char* USAGE_SET_DAEMON("set_daemon <host>[:<port>] [trusted|untrusted]");
   const char* USAGE_SHOW_BALANCE("balance [detail]");
@@ -234,7 +241,7 @@ namespace
   const char* USAGE_MMS("mms [<subcommand> [<subcommand_parameters>]]");
   const char* USAGE_MMS_INIT("mms init <required_signers>/<authorized_signers> <own_label> <own_transport_address>");
   const char* USAGE_MMS_INFO("mms info");
-  const char* USAGE_MMS_SIGNER("mms signer [<number> <label> [<transport_address> [<monero_address>]]]");
+  const char* USAGE_MMS_SIGNER("mms signer [<number> <label> [<transport_address> [<coinevo_address>]]]");
   const char* USAGE_MMS_LIST("mms list");
   const char* USAGE_MMS_NEXT("mms next [sync]");
   const char* USAGE_MMS_SYNC("mms sync");
@@ -461,7 +468,7 @@ namespace
     std::stringstream prompt;
     prompt << sw::tr("For URL: ") << url
            << ", " << dnssec_str << std::endl
-           << sw::tr(" Monero Address = ") << addresses[0]
+           << sw::tr(" Coinevo Address = ") << addresses[0]
            << std::endl
            << sw::tr("Is this OK?")
     ;
@@ -1635,7 +1642,7 @@ bool simple_wallet::export_raw_multisig(const std::vector<std::string> &args)
     for (auto &ptx: txs.m_ptx)
     {
       const crypto::hash txid = cryptonote::get_transaction_hash(ptx.tx);
-      const std::string filename = std::string("raw_multisig_monero_tx_") + epee::string_tools::pod_to_hex(txid);
+      const std::string filename = std::string("raw_multisig_coinevo_tx_") + epee::string_tools::pod_to_hex(txid);
       if (!filenames.empty())
         filenames += ", ";
       filenames += filename;
@@ -2280,25 +2287,25 @@ bool simple_wallet::public_nodes(const std::vector<std::string> &args)
 
 bool simple_wallet::welcome(const std::vector<std::string> &args)
 {
-  message_writer() << tr("Welcome to Monero, the private cryptocurrency.");
+  message_writer() << tr("Welcome to Coinevo, the private cryptocurrency.");
   message_writer() << "";
-  message_writer() << tr("Monero, like Bitcoin, is a cryptocurrency. That is, it is digital money.");
-  message_writer() << tr("Unlike Bitcoin, your Monero transactions and balance stay private and are not visible to the world by default.");
+  message_writer() << tr("Coinevo, like Bitcoin, is a cryptocurrency. That is, it is digital money.");
+  message_writer() << tr("Unlike Bitcoin, your Coinevo transactions and balance stay private and are not visible to the world by default.");
   message_writer() << tr("However, you have the option of making those available to select parties if you choose to.");
   message_writer() << "";
-  message_writer() << tr("Monero protects your privacy on the blockchain, and while Monero strives to improve all the time,");
-  message_writer() << tr("no privacy technology can be 100% perfect, Monero included.");
-  message_writer() << tr("Monero cannot protect you from malware, and it may not be as effective as we hope against powerful adversaries.");
-  message_writer() << tr("Flaws in Monero may be discovered in the future, and attacks may be developed to peek under some");
-  message_writer() << tr("of the layers of privacy Monero provides. Be safe and practice defense in depth.");
+  message_writer() << tr("Coinevo protects your privacy on the blockchain, and while Coinevo strives to improve all the time,");
+  message_writer() << tr("no privacy technology can be 100% perfect, Coinevo included.");
+  message_writer() << tr("Coinevo cannot protect you from malware, and it may not be as effective as we hope against powerful adversaries.");
+  message_writer() << tr("Flaws in Coinevo may be discovered in the future, and attacks may be developed to peek under some");
+  message_writer() << tr("of the layers of privacy Coinevo provides. Be safe and practice defense in depth.");
   message_writer() << "";
-  message_writer() << tr("Welcome to Monero and financial privacy. For more information see https://GetMonero.org");
+  message_writer() << tr("Welcome to Coinevo and financial privacy. For more information see https://coinevo.tech");
   return true;
 }
 
 bool simple_wallet::version(const std::vector<std::string> &args)
 {
-  message_writer() << "Monero '" << MONERO_RELEASE_NAME << "' (v" << MONERO_VERSION_FULL << ")";
+  message_writer() << "Coinevo '" << MONERO_RELEASE_NAME << "' (v" << MONERO_VERSION_FULL << ")";
   return true;
 }
 
@@ -2613,15 +2620,15 @@ bool simple_wallet::set_unit(const std::vector<std::string> &args/* = std::vecto
   const std::string &unit = args[1];
   unsigned int decimal_point = CRYPTONOTE_DISPLAY_DECIMAL_POINT;
 
-  if (unit == "monero")
+  if (unit == "coinevo")
     decimal_point = CRYPTONOTE_DISPLAY_DECIMAL_POINT;
-  else if (unit == "millinero")
+  else if (unit == "millievo")
     decimal_point = CRYPTONOTE_DISPLAY_DECIMAL_POINT - 3;
-  else if (unit == "micronero")
+  else if (unit == "microevo")
     decimal_point = CRYPTONOTE_DISPLAY_DECIMAL_POINT - 6;
-  else if (unit == "nanonero")
+  else if (unit == "nanoevo")
     decimal_point = CRYPTONOTE_DISPLAY_DECIMAL_POINT - 9;
-  else if (unit == "piconero")
+  else if (unit == "picoevo")
     decimal_point = 0;
   else
   {
@@ -3047,7 +3054,7 @@ bool simple_wallet::help(const std::vector<std::string> &args/* = std::vector<st
   message_writer() << tr("\"show_transfers [in|out|pending|failed|pool]\" - Show transactions.");
   message_writer() << tr("\"sweep_all <address>\" - Send whole balance to another wallet.");
   message_writer() << tr("\"seed\" - Show secret 25 words that can be used to recover this wallet.");
-  message_writer() << tr("\"refresh\" - Synchronize wallet with the Monero network.");
+  message_writer() << tr("\"refresh\" - Synchronize wallet with the Coinevo network.");
   message_writer() << tr("\"status\" - Check current status of wallet.");
   message_writer() << tr("\"version\" - Check software version.");
   message_writer() << tr("\"help_advanced\" - Show list with more available commands.");
@@ -3094,6 +3101,45 @@ simple_wallet::simple_wallet()
   , m_rpc_payment_hash_rate(-1.0f)
   , m_suspend_rpc_payment_mining(false)
 {
+#if defined(SEKRETA)
+  m_cmd_binder.set_handler(
+      "sekreta",
+boost::bind(&simple_wallet::on_command, this, &simple_wallet::sekreta, _1),
+tr(USAGE_SEKRETA),
+      tr("\n"
+      "  <location> :  Options: <wallet|daemon>\n"
+      "      wallet -  Run sekreta command within the coinevo wallet (if ran within wallet, default is wallet).\n"
+      "      daemon -  Run sekreta command within the coinevo daemon.\n"
+      "  <command>  :  Command to run with sekreta. Options: <configure|start|status|restart|stop>\n"
+      "  <system>   :  Anonymity system to run <command> against. Current options: <kovri|ire|i2p|tor|loki>\n"
+      "  <args>     :  Arguments used against the anonymity system in conjuction with <command>. See the system's documentation for details.\n"
+      "\n"
+      "Example:\n"
+      "\n"
+      "  For remote node (not local coinevod):\n"
+      "\n"
+      "    [wallet 9wNCEM]: sekreta wallet configure kovri --port=12345 --disable-console-log\n"
+      "    [wallet 9wNCEM]: sekreta wallet start kovri\n"
+      "    [wallet 9wNCEM]: sekreta wallet status kovri\n"
+      "    [wallet 9wNCEM]: set_daemon wqr5kmjdpvnlcg7mzlg6bqin3izawq2226gxq4bacgxiy4aeoprq.b32.i2p:18081\n"
+      "    ...\n"
+      "    [wallet 9wNCEM]: sekreta wallet stop kovri\n"
+      "\n"
+      "    or, simply `exit` the wallet.\n"
+      "\n"
+      "  To issue commands to an unrestricted coinevod node; replace the `wallet` command with `daemon`:\n"
+	        "\n"
+      "    [wallet 9wNCEM]: sekreta daemon configure kovri --port=12345 --disable-console-log\n"
+      "    [wallet 9wNCEM]: sekreta daemon start kovri\n"
+      "    [wallet 9wNCEM]: sekreta daemon status kovri\n"
+      "    ...etc.\n"
+      "\n"
+      "NOTE:\n"
+      "  - Replace `--port=12345` with an open/un-firewalled port of choice to be used by your anonymity system (if supported)\n"
+      "  - See the supported anonymity systems' documentation for a full list of options\n"
+      "  - Depending on the anonymity system, you may need to wait for the system to bootstrap (~3-5 minutes) and/or integrate upon each startup"));
+#endif
+
   m_cmd_binder.set_handler("start_mining",
                            boost::bind(&simple_wallet::on_command, this, &simple_wallet::start_mining, _1),
                            tr(USAGE_START_MINING),
@@ -3156,7 +3202,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("donate",
                            boost::bind(&simple_wallet::on_command, this, &simple_wallet::donate, _1),
                            tr(USAGE_DONATE),
-                           tr("Donate <amount> to the development team (donate.getmonero.org)."));
+                           tr("Donate <amount> to the development team (donate.coinevo.tech)."));
   m_cmd_binder.set_handler("sign_transfer",
                            boost::bind(&simple_wallet::on_command, this, &simple_wallet::sign_transfer, _1),
                            tr(USAGE_SIGN_TRANSFER),
@@ -3232,8 +3278,8 @@ simple_wallet::simple_wallet()
                                   "ask-password <0|1|2   (or never|action|decrypt)>\n "
                                   "  action: ask the password before many actions such as transfer, etc\n "
                                   "  decrypt: same as action, but keeps the spend key encrypted in memory when not needed\n "
-                                  "unit <monero|millinero|micronero|nanonero|piconero>\n "
-                                  "  Set the default monero (sub-)unit.\n "
+                                  "unit <coinevo|millievo|microevo|nanoevo|picoevo>\n "
+                                  "  Set the default coinevo (sub-)unit.\n "
                                   "min-outputs-count [n]\n "
                                   "  Try to keep at least that many outputs of value at least min-outputs-value.\n "
                                   "min-outputs-value [n]\n "
@@ -3251,9 +3297,9 @@ simple_wallet::simple_wallet()
                                   "auto-low-priority <1|0>\n "
                                   "  Whether to automatically use the low priority fee level when it's safe to do so.\n "
                                   "segregate-pre-fork-outputs <1|0>\n "
-                                  "  Set this if you intend to spend outputs on both Monero AND a key reusing fork.\n "
+                                  "  Set this if you intend to spend outputs on both Coinevo AND a key reusing fork.\n "
                                   "key-reuse-mitigation2 <1|0>\n "
-                                  "  Set this if you are not sure whether you will spend on a key reusing Monero fork later.\n "
+                                  "  Set this if you are not sure whether you will spend on a key reusing Coinevo fork later.\n "
                                   "subaddress-lookahead <major>:<minor>\n "
                                   "  Set the lookahead sizes for the subaddress hash table.\n "
                                   "segregation-height <n>\n "
@@ -3267,7 +3313,7 @@ simple_wallet::simple_wallet()
                                   "track-uses <1|0>\n "
                                   "  Whether to keep track of owned outputs uses.\n "
                                   "setup-background-mining <1|0>\n "
-                                  "  Whether to enable background mining. Set this to support the network and to get a chance to receive new monero.\n "
+                                  "  Whether to enable background mining. Set this to support the network and to get a chance to receive new coinevo.\n "
                                   "device-name <device_name[:device_spec]>\n "
                                   "  Device name for hardware wallet.\n "
                                   "export-format <\"binary\"|\"ascii\">\n "
@@ -3468,7 +3514,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("mms signer",
                            boost::bind(&simple_wallet::on_command, this, &simple_wallet::mms, _1),
                            tr(USAGE_MMS_SIGNER),
-                           tr("Set or modify authorized signer info (single-word label, transport address, Monero address), or list all signers"));
+                           tr("Set or modify authorized signer info (single-word label, transport address, Coinevo address), or list all signers"));
   m_cmd_binder.set_handler("mms list",
                            boost::bind(&simple_wallet::on_command, this, &simple_wallet::mms, _1),
                            tr(USAGE_MMS_LIST),
@@ -3589,7 +3635,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("welcome",
                            boost::bind(&simple_wallet::on_command, this, &simple_wallet::welcome, _1),
                            tr(USAGE_WELCOME),
-                           tr("Prints basic info about Monero for first time users"));
+                           tr("Prints basic info about Coinevo for first time users"));
   m_cmd_binder.set_handler("version",
                            boost::bind(&simple_wallet::on_command, this, &simple_wallet::version, _1),
                            tr(USAGE_VERSION),
@@ -3722,7 +3768,7 @@ bool simple_wallet::set_variable(const std::vector<std::string> &args)
     CHECK_SIMPLE_VARIABLE("refresh-type", set_refresh_type, tr("full (slowest, no assumptions); optimize-coinbase (fast, assumes the whole coinbase is paid to a single address); no-coinbase (fastest, assumes we receive no coinbase transaction), default (same as optimize-coinbase)"));
     CHECK_SIMPLE_VARIABLE("priority", set_default_priority, tr("0, 1, 2, 3, or 4, or one of ") << join_priority_strings(", "));
     CHECK_SIMPLE_VARIABLE("ask-password", set_ask_password, tr("0|1|2 (or never|action|decrypt)"));
-    CHECK_SIMPLE_VARIABLE("unit", set_unit, tr("monero, millinero, micronero, nanonero, piconero"));
+    CHECK_SIMPLE_VARIABLE("unit", set_unit, tr("coinevo, millievo, microevo, nanoevo, picoevo"));
     CHECK_SIMPLE_VARIABLE("min-outputs-count", set_min_output_count, tr("unsigned integer"));
     CHECK_SIMPLE_VARIABLE("min-outputs-value", set_min_output_value, tr("amount"));
     CHECK_SIMPLE_VARIABLE("merge-destinations", set_merge_destinations, tr("0 or 1"));
@@ -4528,7 +4574,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     bool ssl = false;
     if (m_wallet->check_connection(NULL, &ssl) && !ssl)
       message_writer(console_color_red, true) << boost::format(tr("Using your own without SSL exposes your RPC traffic to monitoring"));
-    message_writer(console_color_red, true) << boost::format(tr("You are strongly encouraged to connect to the Monero network using your own daemon"));
+    message_writer(console_color_red, true) << boost::format(tr("You are strongly encouraged to connect to the Coinevo network using your own daemon"));
     message_writer(console_color_red, true) << boost::format(tr("If you or someone you trust are operating this daemon, you can use --trusted-daemon"));
 
     COMMAND_RPC_GET_INFO::request req;
@@ -4549,7 +4595,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     check_background_mining(password);
 
   if (welcome)
-    message_writer(console_color_yellow, true) << tr("If you are new to Monero, type \"welcome\" for a brief overview.");
+    message_writer(console_color_yellow, true) << tr("If you are new to Coinevo, type \"welcome\" for a brief overview.");
 
   m_last_activity_time = time(NULL);
   return true;
@@ -4768,7 +4814,7 @@ boost::optional<epee::wipeable_string> simple_wallet::new_wallet(const boost::pr
     "Use the \"help\" command to see a simplified list of available commands.\n"
     "Use the \"help_advanced\" command to see an advanced list of available commands.\n"
     "Use \"help_advanced <command>\" to see a command's documentation.\n"
-    "Always use the \"exit\" command when closing monero-wallet-cli to save \n"
+    "Always use the \"exit\" command when closing coinevo-wallet-cli to save \n"
     "your current session's state. Otherwise, you might need to synchronize \n"
     "your wallet again (your wallet keys are NOT at risk in any case).\n")
   ;
@@ -5142,7 +5188,7 @@ void simple_wallet::start_background_mining()
       return;
     }
   }
-  success_msg_writer() << tr("Background mining enabled. Thank you for supporting the Monero network.");
+  success_msg_writer() << tr("Background mining enabled. Thank you for supporting the Coinevo network.");
 }
 //----------------------------------------------------------------------------------------------------
 void simple_wallet::stop_background_mining()
@@ -5214,7 +5260,7 @@ void simple_wallet::check_background_mining(const epee::wipeable_string &passwor
   {
     message_writer() << tr("The daemon is not set up to background mine.");
     message_writer() << tr("With background mining enabled, the daemon will mine when idle and not on battery.");
-    message_writer() << tr("Enabling this supports the network you are using, and makes you eligible for receiving new monero");
+    message_writer() << tr("Enabling this supports the network you are using, and makes you eligible for receiving new coinevo");
     std::string accepted = input_line(tr("Do you want to do it now? (Y/Yes/N/No): "));
     if (std::cin.eof() || !command_line::is_yes(accepted)) {
       m_wallet->setup_background_mining(tools::wallet2::BackgroundMiningNo);
@@ -5232,6 +5278,199 @@ void simple_wallet::check_background_mining(const epee::wipeable_string &passwor
     start_background_mining();
   }
 }
+#if defined(SEKRETA)
+bool simple_wallet::sekreta(const std::vector<std::string>& args)
+{
+  namespace impl = ::sekreta::api::impl_helper;
+  namespace type = impl::type;
+
+  using t_value = std::string;
+  using t_args = impl::WalletArgs<t_value>;
+
+  // Parse args
+  std::pair<std::optional<t_args>, std::optional<t_value>> wallet_args =
+      impl::parse_args<t_args, t_value>(args);
+
+  if (!wallet_args.first)
+    {
+      fail_msg_writer() << tr(wallet_args.second.value().c_str());
+      return true;
+    }
+
+  t_args& parsed_args = wallet_args.first.value();
+
+  if (parsed_args.system_args.empty())
+    {
+      parsed_args.system_args.push_back("--disable-console-log");
+      parsed_args.system_args.push_back("--enable-auto-flush-log");
+    }
+
+  type::kSystem const system =
+      t_args::get_key<type::kSystem>(parsed_args.system).value();
+
+  // TODO(anonimal): temporary
+  if (system != type::kSystem::Kovri)
+    {
+      fail_msg_writer() << tr("Only Kovri is currently supported");
+      return true;
+    }
+
+  // Send to daemon if requested
+  if (t_args::get_key<type::kLocation>(parsed_args.location).value()
+      == type::kLocation::Daemon)
+    {
+      COMMAND_RPC_SEKRETA::request req;
+      COMMAND_RPC_SEKRETA::response res;
+
+      req.command = parsed_args.command;
+      req.system = parsed_args.system;
+      req.system_args = parsed_args.system_args;
+
+      std::string const error = interpret_rpc_response(
+          m_wallet->invoke_http_json("/sekreta", req, res), res.status);
+
+      if (error.empty())
+        {
+          success_msg_writer()
+              << tr("Sekreta executed '") << tr(parsed_args.system.c_str())
+              << tr("' in daemon");
+          return true;
+        }
+
+      fail_msg_writer() << tr("Sekreta has NOT been executed: ") << error;
+      return true;
+    }
+
+  // Shared Sekreta instance between wallet2/simplewallet
+  std::shared_ptr<net::sekreta::Sekreta> sekreta = m_wallet->sekreta();
+
+  // TODO(anonimal): temporary single-system only
+  namespace api = ::sekreta::api::kovri;
+  std::shared_ptr<api::Library> lib;
+
+  net::sekreta::UID const uid({std::string{tools::wallet2::UID}});
+  std::string const uid_lib{uid.name() + "lib"};
+  std::string const uid_path{uid.name() + "rpc client"};
+  std::string const uid_trait{uid.name() + "trait"};
+
+  std::string error;  // exception error
+  try
+    {
+      // Check-in if not already done so by wallet2 and/or borrow
+      if (!sekreta->contains<api::Library>({uid_lib}))
+        sekreta->check_in<api::Library>({uid_lib});
+      lib = sekreta->borrow<api::Library>({uid_lib});
+
+      // TODO(anonimal): in Kovri, command exceptions are caught and log printed
+      switch (t_args::get_key<type::kCommand>(parsed_args.command).value())
+        {
+          case type::kCommand::Configure:
+            {
+              // TODO(anonimal): Sekreta only allows to configure once,
+              //   regardless if stop'd
+              lib->configure(parsed_args.system_args);
+
+              success_msg_writer()
+                  << tr(parsed_args.system.c_str()) << tr(" configured");
+            }
+            break;
+          case type::kCommand::Start:
+            {
+              if (lib->status()->is_running())
+                {
+                  fail_msg_writer() << tr(
+                      "Instance has already started. Stop and start again");
+                  return true;
+                }
+
+              lib->start();
+
+              success_msg_writer()
+                  << tr(parsed_args.system.c_str()) << tr(" started");
+            }
+            break;
+          case type::kCommand::Restart:
+            {
+              if (!lib->status()->is_running())
+                {
+                  fail_msg_writer()
+                      << tr("Instance is not running. Start, if so desired.");
+                  return true;
+                }
+
+              lib->restart();
+
+              success_msg_writer()
+                  << tr(parsed_args.system.c_str()) << tr(" restarted");
+            }
+            break;
+          case type::kCommand::Status:
+            {
+              if (!lib->status()->is_running())
+                {
+                  fail_msg_writer()
+                      << tr("Instance is not running. Start, if so desired.");
+                  return true;
+                }
+
+              std::shared_ptr<api::Library::Status> status = lib->status();
+
+              success_msg_writer()
+                  << tr("Version: ") << status->version() << "\n"
+                  << tr("Data dir: ") << status->data_dir() << "\n"
+                  << tr("Uptime (seconds): ") << status->uptime() << "\n"
+                  << tr("State: ") << status->state() << "\n"
+                  << tr("Inbound bandwidth: ") << status->inbound_bandwidth() << "\n"
+                  << tr("Outbound bandwidth: ") << status->outbound_bandwidth() << "\n"
+                  << tr("Router path creation rate (percentage): ") << status->path_creation_rate() << "%\n"
+                  << tr("Router path count: ") << status->path_count() << "\n"
+                  << tr("Active peer count: ") << status->active_peer_count() << "\n"
+                  << tr("Known peer count: ") << status->known_peer_count();
+
+              if (system == type::kSystem::Kovri || system == type::kSystem::Ire
+                  || system == type::kSystem::I2P)
+                {
+                  success_msg_writer()
+                      << tr("Floodfill count: ") << status->floodfill_count() << "\n"
+                      << tr("Leaseset count: ") << status->leaseset_count();
+                }
+            }
+            break;
+          case type::kCommand::Stop:
+            {
+              if (!lib->status()->is_running())
+                {
+                  fail_msg_writer()
+                      << tr("Instance is not running. Start, if so desired.");
+                  return true;
+                }
+
+              lib->stop();
+
+              success_msg_writer()
+                  << tr(parsed_args.system.c_str()) << tr(" stopped");
+            }
+            break;
+          default:
+            fail_msg_writer() << tr("Unsupported option");
+            return false;
+        }
+
+      // Check-in for Nth iteration of this function
+      sekreta->check_in<api::Library>({uid_lib}, lib);
+    }
+  catch (const sekreta::Exception& ex)
+    {
+      error = ex.what();
+    }
+
+  if (!error.empty())
+    fail_msg_writer() << tr(error.c_str());
+
+  return true;
+}
+#endif
+
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::start_mining(const std::vector<std::string>& args)
 {
@@ -5368,14 +5607,149 @@ bool simple_wallet::set_daemon(const std::vector<std::string>& args)
       fail_msg_writer() << tr("Unexpected array length - Exited simple_wallet::set_daemon()");
       return true;
     }
-    // If no port has been provided, use the default from config
-    if (!match[3].length())
-    {
-      uint16_t daemon_port = get_config(m_wallet->nettype()).RPC_DEFAULT_PORT;
-      daemon_url = match[1] + match[2] + std::string(":") + std::to_string(daemon_port);
-    } else {
-      daemon_url = args[0];
-    }
+
+    std::string scheme{match[1]}, host{match[2]}, delimiter{match[3]},
+        port{std::to_string(get_config(m_wallet->nettype()).RPC_DEFAULT_PORT)};
+
+    if (scheme.empty())
+      scheme =
+          "http://";  // Note: this won't (shouldn't) interfere with daemon-ssl
+
+    // Parse-out port that's included with delimiter
+    if (!delimiter.empty() && delimiter != ":")
+      {
+        std::vector<std::string> parsed;
+        boost::split(parsed, delimiter, boost::is_any_of(":"));
+        port = parsed.at(1);
+      }
+    delimiter = ":";
+#if defined(SEKRETA)
+    // If host is an anon address, set the path using given host and port, and
+    //   then set the given host and port locally to pipe RPC through that path
+
+    namespace impl = ::sekreta::api::impl_helper;
+
+    using t_address = expect<epee::net_utils::network_address>;
+    using t_value = std::string;
+
+    std::pair<std::optional<t_address>, std::optional<t_value>> const address =
+        net::sekreta::parse_cli_arg<t_address, t_value>(
+            {host, boost::lexical_cast<uint16_t>(port)},
+            // TODO(unassigned): single-system is temporary
+            {impl::Args<t_value>::get_value<impl::type::kSystem>(
+                 impl::type::kSystem::Kovri)
+                 .value()});
+
+    THROW_WALLET_EXCEPTION_IF(
+        !address.first,
+        tools::error::wallet_internal_error,
+        tools::wallet2::tr(address.second.value().c_str()));
+
+    // Set host/port locally to pipe through anon path
+    host = "127.0.0.1";
+
+    // TODO(unassigned): would be nice to have a get_random_port() that provides
+    //   only available ports...
+    port = std::to_string(
+        cryptonote::get_config(m_wallet->nettype()).SEK_RPC_DEFAULT_PORT);
+
+    auto const create_path = [&]() {
+      // Shared Sekreta instance between wallet2/simplewallet
+      std::shared_ptr<net::sekreta::Sekreta> sekreta = m_wallet->sekreta();
+      namespace type = ::sekreta::type;
+
+      // TODO(anonimal): temporary single-system only
+      namespace api = ::sekreta::api::kovri;
+      std::shared_ptr<api::Trait> trait;
+      std::shared_ptr<api::Library> lib;
+      std::shared_ptr<api::Library::Path> path;
+      std::shared_ptr<type::kovri::PathData> path_data;
+
+      net::sekreta::UID const uid({std::string{tools::wallet2::UID}});
+      std::string const uid_lib{uid.name() + "lib"};
+      std::string const uid_path{uid.name() + "rpc-client"};
+      std::string const uid_trait{uid.name() + "trait"};
+
+      std::string error;  // exception error
+      try
+        {
+          if (!sekreta->contains<api::Library>({uid_lib}))
+            {
+              fail_msg_writer() << tr(
+                  "Sekreta has not created an instance. Try `help sekreta`");
+              return false;
+            }
+
+          if (!sekreta->contains<api::Trait>({uid_trait}))
+            sekreta->check_in<api::Trait>({uid_trait});
+          trait = sekreta->check_out<api::Trait>({uid_trait});
+
+          lib = sekreta->borrow<api::Library>({uid_lib});
+          if (!lib->status()->is_running())
+            lib->start();  // assuming already configured
+
+          // Clear out previous tunnel set by wallet
+          if (sekreta->contains<api::Library::Path>({uid_path}))
+            {
+              path = sekreta->check_out<api::Library::Path>({uid_path});
+              path->stop();
+              sekreta->erase<api::Library::Path>({uid_path});
+            }
+
+          try
+            {
+              // Create client tunnel
+              path_data =
+                  trait->path()
+                      ->uid({"Coinevo RPC client tunnel"})
+                      // TODO(unassigned): if/once supported, àffect can be HTTP
+                      .type({type::kPathDirection::Client,
+                             type::kPathAffect::Default})
+                      .local_point(
+                          {host, {boost::lexical_cast<uint16_t>(port), {}}})
+                      .remote_point({address.first.value()->host_str(),
+                                     address.first.value()->port()})
+                      .build();
+
+              path = lib->path(path_data);
+              path->configure();
+              path->start();
+
+              success_msg_writer()
+                  << "Sekreta path created to "
+                  << path_data->remote_point().dest() << delimiter
+                  << path_data->remote_point().port();
+            }
+          catch (const ::sekreta::Exception& ex)
+            {
+              error = ex.what();
+            }
+        }
+      catch (const ::sekreta::Exception& ex)
+        {
+          error = ex.what();
+        }
+
+      if (!error.empty())
+        {
+          fail_msg_writer() << tr(error.c_str());
+          return false;
+        }
+
+      sekreta->check_in<api::Library::Path>({uid_path}, path);
+      sekreta->check_in<api::Library>({uid_lib}, lib);
+      sekreta->check_in<api::Trait>({uid_trait}, trait);
+      return true;
+    };
+
+    if (!create_path())
+      return true;
+
+    success_msg_writer() << "Wallet will take a while to connect/refresh/exit. "
+                            "Connecting through "
+                         << scheme + host + delimiter + port;
+#endif
+    daemon_url = scheme + host + delimiter + port;
     LOCK_IDLE_SCOPE();
     m_wallet->init(daemon_url);
 
@@ -5394,6 +5768,8 @@ bool simple_wallet::set_daemon(const std::vector<std::string>& args)
     else
     {
       m_wallet->set_trusted_daemon(false);
+#if !defined(SEKRETA)  // Pointing to local doesn't imply trusted
+
       try
       {
         if (tools::is_local_address(m_wallet->get_daemon_address()))
@@ -5403,6 +5779,7 @@ bool simple_wallet::set_daemon(const std::vector<std::string>& args)
         }
       }
       catch (const std::exception &e) { }
+#endif
     }
 
     if (!try_connect_to_daemon())
@@ -6233,7 +6610,7 @@ void simple_wallet::check_for_inactivity_lock(bool user)
     m_in_command = true;
     if (!user)
     {
-      const std::string speech = tr("I locked your Monero wallet to protect you while you were away\nsee \"help_advanced set\" to configure/disable");
+      const std::string speech = tr("I locked your Coinevo wallet to protect you while you were away\nsee \"help_advanced set\" to configure/disable");
       std::vector<std::pair<std::string, size_t>> lines = tools::split_string_by_width(speech, 45);
 
       size_t max_len = 0;
@@ -6426,7 +6803,7 @@ bool simple_wallet::transfer_main(int transfer_type, const std::vector<std::stri
     }
     else
     {
-      if (boost::starts_with(local_args[i], "monero:"))
+      if (boost::starts_with(local_args[i], "coinevo:"))
         fail_msg_writer() << tr("Invalid last argument: ") << local_args.back() << ": " << error;
       else
         fail_msg_writer() << tr("Invalid last argument: ") << local_args.back();
@@ -6663,7 +7040,7 @@ bool simple_wallet::transfer_main(int transfer_type, const std::vector<std::stri
     }
     else if (m_wallet->multisig())
     {
-      bool r = m_wallet->save_multisig_tx(ptx_vector, "multisig_monero_tx");
+      bool r = m_wallet->save_multisig_tx(ptx_vector, "multisig_coinevo_tx");
       if (!r)
       {
         fail_msg_writer() << tr("Failed to write transaction(s) to file");
@@ -6671,7 +7048,7 @@ bool simple_wallet::transfer_main(int transfer_type, const std::vector<std::stri
       }
       else
       {
-        success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "multisig_monero_tx";
+        success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "multisig_coinevo_tx";
       }
     }
     else if (m_wallet->get_account().get_device().has_tx_cold_sign())
@@ -6700,7 +7077,7 @@ bool simple_wallet::transfer_main(int transfer_type, const std::vector<std::stri
     }
     else if (m_wallet->watch_only())
     {
-      bool r = m_wallet->save_tx(ptx_vector, "unsigned_monero_tx");
+      bool r = m_wallet->save_tx(ptx_vector, "unsigned_coinevo_tx");
       if (!r)
       {
         fail_msg_writer() << tr("Failed to write transaction(s) to file");
@@ -6708,7 +7085,7 @@ bool simple_wallet::transfer_main(int transfer_type, const std::vector<std::stri
       }
       else
       {
-        success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "unsigned_monero_tx";
+        success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "unsigned_coinevo_tx";
       }
     }
     else
@@ -6802,26 +7179,26 @@ bool simple_wallet::sweep_unmixable(const std::vector<std::string> &args_)
     // actually commit the transactions
     if (m_wallet->multisig())
     {
-      bool r = m_wallet->save_multisig_tx(ptx_vector, "multisig_monero_tx");
+      bool r = m_wallet->save_multisig_tx(ptx_vector, "multisig_coinevo_tx");
       if (!r)
       {
         fail_msg_writer() << tr("Failed to write transaction(s) to file");
       }
       else
       {
-        success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "multisig_monero_tx";
+        success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "multisig_coinevo_tx";
       }
     }
     else if (m_wallet->watch_only())
     {
-      bool r = m_wallet->save_tx(ptx_vector, "unsigned_monero_tx");
+      bool r = m_wallet->save_tx(ptx_vector, "unsigned_coinevo_tx");
       if (!r)
       {
         fail_msg_writer() << tr("Failed to write transaction(s) to file");
       }
       else
       {
-        success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "unsigned_monero_tx";
+        success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "unsigned_coinevo_tx";
       }
     }
     else
@@ -7102,14 +7479,14 @@ bool simple_wallet::sweep_main(uint64_t below, bool locked, const std::vector<st
     // actually commit the transactions
     if (m_wallet->multisig())
     {
-      bool r = m_wallet->save_multisig_tx(ptx_vector, "multisig_monero_tx");
+      bool r = m_wallet->save_multisig_tx(ptx_vector, "multisig_coinevo_tx");
       if (!r)
       {
         fail_msg_writer() << tr("Failed to write transaction(s) to file");
       }
       else
       {
-        success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "multisig_monero_tx";
+        success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "multisig_coinevo_tx";
       }
     }
     else if (m_wallet->get_account().get_device().has_tx_cold_sign())
@@ -7139,14 +7516,14 @@ bool simple_wallet::sweep_main(uint64_t below, bool locked, const std::vector<st
     }
     else if (m_wallet->watch_only())
     {
-      bool r = m_wallet->save_tx(ptx_vector, "unsigned_monero_tx");
+      bool r = m_wallet->save_tx(ptx_vector, "unsigned_coinevo_tx");
       if (!r)
       {
         fail_msg_writer() << tr("Failed to write transaction(s) to file");
       }
       else
       {
-        success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "unsigned_monero_tx";
+        success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "unsigned_coinevo_tx";
       }
     }
     else
@@ -7337,26 +7714,26 @@ bool simple_wallet::sweep_single(const std::vector<std::string> &args_)
     // actually commit the transactions
     if (m_wallet->multisig())
     {
-      bool r = m_wallet->save_multisig_tx(ptx_vector, "multisig_monero_tx");
+      bool r = m_wallet->save_multisig_tx(ptx_vector, "multisig_coinevo_tx");
       if (!r)
       {
         fail_msg_writer() << tr("Failed to write transaction(s) to file");
       }
       else
       {
-        success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "multisig_monero_tx";
+        success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "multisig_coinevo_tx";
       }
     }
     else if (m_wallet->watch_only())
     {
-      bool r = m_wallet->save_tx(ptx_vector, "unsigned_monero_tx");
+      bool r = m_wallet->save_tx(ptx_vector, "unsigned_coinevo_tx");
       if (!r)
       {
         fail_msg_writer() << tr("Failed to write transaction(s) to file");
       }
       else
       {
-        success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "unsigned_monero_tx";
+        success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "unsigned_coinevo_tx";
       }
     }
     else
@@ -7456,7 +7833,7 @@ bool simple_wallet::donate(const std::vector<std::string> &args_)
   if (!payment_id_str.empty())
     local_args.push_back(payment_id_str);
   if (m_wallet->nettype() == cryptonote::MAINNET)
-    message_writer() << (boost::format(tr("Donating %s %s to The Monero Project (donate.getmonero.org or %s).")) % amount_str % cryptonote::get_unit(cryptonote::get_default_decimal_point()) % MONERO_DONATION_ADDR).str();
+    message_writer() << (boost::format(tr("Donating %s %s to The Coinevo Project (donate.coinevo.tech or %s).")) % amount_str % cryptonote::get_unit(cryptonote::get_default_decimal_point()) % MONERO_DONATION_ADDR).str();
   else
     message_writer() << (boost::format(tr("Donating %s %s to %s.")) % amount_str % cryptonote::get_unit(cryptonote::get_default_decimal_point()) % address_str).str();
   transfer(local_args);
@@ -7655,7 +8032,7 @@ bool simple_wallet::sign_transfer(const std::vector<std::string> &args_)
   std::vector<tools::wallet2::pending_tx> ptx;
   try
   {
-    bool r = m_wallet->sign_tx("unsigned_monero_tx", "signed_monero_tx", ptx, [&](const tools::wallet2::unsigned_tx_set &tx){ return accept_loaded_tx(tx); }, export_raw);
+    bool r = m_wallet->sign_tx("unsigned_coinevo_tx", "signed_coinevo_tx", ptx, [&](const tools::wallet2::unsigned_tx_set &tx){ return accept_loaded_tx(tx); }, export_raw);
     if (!r)
     {
       fail_msg_writer() << tr("Failed to sign transaction");
@@ -7675,7 +8052,7 @@ bool simple_wallet::sign_transfer(const std::vector<std::string> &args_)
       txids_as_text += (", ");
     txids_as_text += epee::string_tools::pod_to_hex(get_transaction_hash(t.tx));
   }
-  success_msg_writer(true) << tr("Transaction successfully signed to file ") << "signed_monero_tx" << ", txid " << txids_as_text;
+  success_msg_writer(true) << tr("Transaction successfully signed to file ") << "signed_coinevo_tx" << ", txid " << txids_as_text;
   if (export_raw)
   {
     std::string rawfiles_as_text;
@@ -7683,7 +8060,7 @@ bool simple_wallet::sign_transfer(const std::vector<std::string> &args_)
     {
       if (i > 0)
         rawfiles_as_text += ", ";
-      rawfiles_as_text += "signed_monero_tx_raw" + (ptx.size() == 1 ? "" : ("_" + std::to_string(i)));
+      rawfiles_as_text += "signed_coinevo_tx_raw" + (ptx.size() == 1 ? "" : ("_" + std::to_string(i)));
     }
     success_msg_writer(true) << tr("Transaction raw hex data exported to ") << rawfiles_as_text;
   }
@@ -7703,7 +8080,7 @@ bool simple_wallet::submit_transfer(const std::vector<std::string> &args_)
   try
   {
     std::vector<tools::wallet2::pending_tx> ptx_vector;
-    bool r = m_wallet->load_tx("signed_monero_tx", ptx_vector, [&](const tools::wallet2::signed_tx_set &tx){ return accept_loaded_tx(tx); });
+    bool r = m_wallet->load_tx("signed_coinevo_tx", ptx_vector, [&](const tools::wallet2::signed_tx_set &tx){ return accept_loaded_tx(tx); });
     if (!r)
     {
       fail_msg_writer() << tr("Failed to load transaction from file");
@@ -7853,7 +8230,7 @@ bool simple_wallet::get_tx_proof(const std::vector<std::string> &args)
   try
   {
     std::string sig_str = m_wallet->get_tx_proof(txid, info.address, info.is_subaddress, args.size() == 3 ? args[2] : "");
-    const std::string filename = "monero_tx_proof";
+    const std::string filename = "coinevo_tx_proof";
     if (m_wallet->save_to_file(filename, sig_str, true))
       success_msg_writer() << tr("signature file saved to: ") << filename;
     else
@@ -8065,7 +8442,7 @@ bool simple_wallet::get_spend_proof(const std::vector<std::string> &args)
   try
   {
     const std::string sig_str = m_wallet->get_spend_proof(txid, args.size() == 2 ? args[1] : "");
-    const std::string filename = "monero_spend_proof";
+    const std::string filename = "coinevo_spend_proof";
     if (m_wallet->save_to_file(filename, sig_str, true))
       success_msg_writer() << tr("signature file saved to: ") << filename;
     else
@@ -8154,7 +8531,7 @@ bool simple_wallet::get_reserve_proof(const std::vector<std::string> &args)
   try
   {
     const std::string sig_str = m_wallet->get_reserve_proof(account_minreserve, args.size() == 2 ? args[1] : "");
-    const std::string filename = "monero_reserve_proof";
+    const std::string filename = "coinevo_reserve_proof";
     if (m_wallet->save_to_file(filename, sig_str, true))
       success_msg_writer() << tr("signature file saved to: ") << filename;
     else
@@ -10175,7 +10552,7 @@ void simple_wallet::commit_or_save(std::vector<tools::wallet2::pending_tx>& ptx_
       cryptonote::blobdata blob;
       tx_to_blob(ptx.tx, blob);
       const std::string blob_hex = epee::string_tools::buff_to_hex_nodelimer(blob);
-      const std::string filename = "raw_monero_tx" + (ptx_vector.size() == 1 ? "" : ("_" + std::to_string(i++)));
+      const std::string filename = "raw_coinevo_tx" + (ptx_vector.size() == 1 ? "" : ("_" + std::to_string(i++)));
       if (m_wallet->save_to_file(filename, blob_hex, true))
         success_msg_writer(true) << tr("Transaction successfully saved to ") << filename << tr(", txid ") << txid;
       else
@@ -10237,12 +10614,12 @@ int main(int argc, char* argv[])
   bool should_terminate = false;
   std::tie(vm, should_terminate) = wallet_args::main(
    argc, argv,
-   "monero-wallet-cli [--wallet-file=<filename>|--generate-new-wallet=<filename>] [<COMMAND>]",
-    sw::tr("This is the command line monero wallet. It needs to connect to a monero\ndaemon to work correctly.\nWARNING: Do not reuse your Monero keys on another fork, UNLESS this fork has key reuse mitigations built in. Doing so will harm your privacy."),
+   "coinevo-wallet-cli [--wallet-file=<filename>|--generate-new-wallet=<filename>] [<COMMAND>]",
+    sw::tr("This is the command line coinevo wallet. It needs to connect to a coinevo\ndaemon to work correctly.\nWARNING: Do not reuse your Coinevo keys on another fork, UNLESS this fork has key reuse mitigations built in. Doing so will harm your privacy."),
     desc_params,
     positional_options,
     [](const std::string &s, bool emphasis){ tools::scoped_message_writer(emphasis ? epee::console_color_white : epee::console_color_default, true) << s; },
-    "monero-wallet-cli.log"
+    "coinevo-wallet-cli.log"
   );
 
   if (!vm)
@@ -10421,7 +10798,7 @@ void simple_wallet::list_mms_messages(const std::vector<mms::message> &messages)
 void simple_wallet::list_signers(const std::vector<mms::authorized_signer> &signers)
 {
   message_writer() << boost::format("%2s %-20s %-s") % tr("#") % tr("Label") % tr("Transport Address");
-  message_writer() << boost::format("%2s %-20s %-s") % "" % tr("Auto-Config Token") % tr("Monero Address");
+  message_writer() << boost::format("%2s %-20s %-s") % "" % tr("Auto-Config Token") % tr("Coinevo Address");
   for (size_t i = 0; i < signers.size(); ++i)
   {
     const mms::authorized_signer &signer = signers[i];
@@ -10627,7 +11004,7 @@ void simple_wallet::mms_signer(const std::vector<std::string> &args)
   }
   if ((args.size() < 2) || (args.size() > 4))
   {
-    fail_msg_writer() << tr("mms signer [<number> <label> [<transport_address> [<monero_address>]]]");
+    fail_msg_writer() << tr("mms signer [<number> <label> [<transport_address> [<coinevo_address>]]]");
     return;
   }
 
@@ -10646,14 +11023,14 @@ void simple_wallet::mms_signer(const std::vector<std::string> &args)
     bool ok = cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), args[3], oa_prompter);
     if (!ok)
     {
-      fail_msg_writer() << tr("Invalid Monero address");
+      fail_msg_writer() << tr("Invalid Coinevo address");
       return;
     }
     monero_address = info.address;
     const std::vector<mms::message> &messages = ms.get_all_messages();
     if ((messages.size() > 0) || state.multisig)
     {
-      fail_msg_writer() << tr("Wallet state does not allow changing Monero addresses anymore");
+      fail_msg_writer() << tr("Wallet state does not allow changing Coinevo addresses anymore");
       return;
     }
   }

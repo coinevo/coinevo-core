@@ -65,7 +65,9 @@
 #include "message_store.h"
 #include "wallet_light_rpc.h"
 #include "wallet_rpc_helpers.h"
-
+#if defined(SEKRETA)
+#include "net/sekreta.h"
+#endif
 #undef MONERO_DEFAULT_LOG_CATEGORY
 #define MONERO_DEFAULT_LOG_CATEGORY "wallet.wallet2"
 
@@ -757,6 +759,23 @@ private:
       uint64_t upper_transaction_weight_limit = 0,
       bool trusted_daemon = true,
       epee::net_utils::ssl_options_t ssl_options = epee::net_utils::ssl_support_t::e_ssl_support_autodetect);
+#if defined(SEKRETA)
+   public:
+    //! \brief UID shared between wallet2 and simplewallet
+    //! \note Trivially destructible for static storage duration
+    constexpr static std::string_view UID = "-wallet-";
+
+    //! \return Copy of pointer to shared Sekreta instance
+    //! \todo It's still too early to know if we need an actual copy as there's
+    //!   currently no need to reseat, etc.
+    std::shared_ptr<net::sekreta::Sekreta> sekreta() { return m_sekreta; }
+
+   private:
+    //! \brief Wallet's Sekreta instance
+    std::shared_ptr<net::sekreta::Sekreta> m_sekreta;
+
+   public:
+#endif
     bool set_daemon(std::string daemon_address = "http://localhost:8080",
       boost::optional<epee::net_utils::http::login> daemon_login = boost::none, bool trusted_daemon = true,
       epee::net_utils::ssl_options_t ssl_options = epee::net_utils::ssl_support_t::e_ssl_support_autodetect);
