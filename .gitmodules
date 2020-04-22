@@ -13,4 +13,4 @@
 	url = https://github.com/coinevo/RandomEVO
 [submodule "external/miniupnp"]
 	path = external/miniupnp
-	url = https://github.com/monero-project/miniupnp
+	url = https://github.com/anonimal/miniupnp
