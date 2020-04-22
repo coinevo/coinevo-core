@@ -1644,17 +1644,13 @@ namespace cryptonote
         main_message = "The daemon will start synchronizing with the network. This may take a long time to complete.";
         MGINFO_MAGENTA(ENDL <<
         "\n \n"
-        "                   -----------                           _____________  		  \n"
-        "                   |              \                  /  /  	        \ 		  \n"
-        "                   |               \                /   |  		| 		  \n"
-        "                   |                \              /    |   		| 		  \n"
-        "                   |                 \            /     |   		| 		  \n"
-        "                   |_ _ _ _ _ _       \          /      |              | 		  \n"
-        "                   |                   \        /       |   		| 		  \n"
-        "                   |                    \      /        |  		| 		  \n"
-        "                   |                     \    /         |  		| 		  \n"
-        "                   |                      \  /          \              | 		  \n"
-        "                   |____________           \/            \____________/                  \n"
+        "                wwwwww                         \n"
+        "      V14       ww     w         w   o o o o   \n"
+        "                ww      w       w   o        o \n"
+        "                wwwwww   w     w    o        o \n"
+        "                ww        w   w     o        o \n"
+        "                ww         w w      o        o \n"
+        "                wwwwww      w        o o o o   \n"
         "\n \n" << ENDL);
       MGINFO_YELLOW(ENDL << "**********************************************************************" << ENDL
         << main_message << ENDL

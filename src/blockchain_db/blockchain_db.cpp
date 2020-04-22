@@ -431,7 +431,7 @@ void BlockchainDB::fixup()
     LOG_PRINT_L1("Database is opened read only - skipping fixup check");
     return;
   }
-  batch_stop();
+  set_batch_transactions(true);
 }
 
 bool BlockchainDB::txpool_tx_matches_category(const crypto::hash& tx_hash, relay_category category)
