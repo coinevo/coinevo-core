@@ -4949,9 +4949,9 @@ bool Blockchain::for_all_txpool_txes(std::function<bool(const crypto::hash&, con
   return m_db->for_all_txpool_txes(f, include_blob, tx_category);
 }
 
-bool Blockchain::txpool_tx_matches_category(const crypto::hash& tx_hash, relay_category tx_category)
+bool Blockchain::txpool_tx_matches_category(const crypto::hash& tx_hash, relay_category category)
 {
-  return m_db->txpool_tx_matches_category(tx_hash, tx_category);
+  return m_db->txpool_tx_matches_category(tx_hash, category);
 }
 
 void Blockchain::set_user_options(uint64_t maxthreads, bool sync_on_blocks, uint64_t sync_threshold, blockchain_db_sync_mode sync_mode, bool fast_sync)
