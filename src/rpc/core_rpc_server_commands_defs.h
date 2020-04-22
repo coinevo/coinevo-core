@@ -97,6 +97,7 @@ namespace cryptonote
 #define CORE_RPC_VERSION_MINOR 1
 #else
 #define CORE_RPC_VERSION_MINOR 1
+#endif
 #define MAKE_CORE_RPC_VERSION(major,minor) (((major)<<16)|(minor))
 #define CORE_RPC_VERSION MAKE_CORE_RPC_VERSION(CORE_RPC_VERSION_MAJOR, CORE_RPC_VERSION_MINOR)
 
