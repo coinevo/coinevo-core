@@ -431,8 +431,6 @@ void BlockchainDB::fixup()
     LOG_PRINT_L1("Database is opened read only - skipping fixup check");
     return;
   }
-
-  }
   batch_stop();
 }
 
