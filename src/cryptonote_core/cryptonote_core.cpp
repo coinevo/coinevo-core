@@ -1642,7 +1642,7 @@ namespace cryptonote
         main_message = "The daemon is running offline and will not attempt to sync to the coinevo network.";
       else
         main_message = "The daemon will start synchronizing with the network. This may take a long time to complete.";
-        MGINFO_MAGENTA(ENDL <<
+        MGINFO_YELLOW(ENDL <<
         "\n \n"
         "						            \n"
         "       -----------                           ____________  \n"
