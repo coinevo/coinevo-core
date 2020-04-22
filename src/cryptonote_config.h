@@ -202,7 +202,7 @@ namespace config
   uint64_t const CRYPTONOTE_PUBLIC_SUBADDRESS_BASE58_PREFIX = 42;
   uint16_t const P2P_DEFAULT_PORT = 33330;
   uint16_t const RPC_DEFAULT_PORT = 33331;
-  uint16_t const ZMQ_RPC_DEFAULT_PORT = 333332;
+  uint16_t const ZMQ_RPC_DEFAULT_PORT = 33332;
 #if defined(SEKRETA)
   uint16_t const SEK_RPC_DEFAULT_PORT = 33333;  //!< Client port
 #endif
